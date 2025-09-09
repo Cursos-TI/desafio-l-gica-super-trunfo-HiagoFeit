@@ -4,35 +4,33 @@
 #include <ctype.h>
 
 /*
-  Super Trunfo – Países
-  Níveis atendidos:
-    - Novato: cadastro interativo, comparação básica, exibição de resultados.
-    - Aventureiro: menu interativo com switch, comparação aninhada, regra especial.
-    - Mestre: escolha de DOIS atributos, lógica encadeada + operadores ternários, menus dinâmicos.
+  Super Trunfo — Países (Nível Mestre)
+  Requisitos atendidos:
+    - Escolha de DOIS atributos numéricos distintos via menus dinâmicos (switch).
+    - Comparação individual por atributo (maior vence; densidade MENOR vence).
+    - Soma dos atributos (valores brutos). Maior soma vence. Empate tratado.
+    - Exibição clara: países, atributos, valores, somas e resultado.
+    - Tratamento de entradas inválidas e mensagens claras.
+    - Uso de operador ternário na lógica de decisão.
 
   Como compilar:
-    gcc -Wall -Wextra -O2 super_trunfo_paises.c -o super_trunfo && ./super_trunfo
+    gcc -Wall -Wextra -O2 super_trunfo_mestre.c -o super_trunfo && ./super_trunfo
 */
 
-/* ============================
-   Modelos e Constantes
-   ============================ */
-
 typedef struct {
-    char codigo[8];            // Ex: "A01"
-    char nomePais[64];         // Ex: "Brasil"
-    long long populacao;       // habitantes
-    double area;               // km²
-    double pib;                // unidade livre (ex.: bilhões)
-    int  pontosTuristicos;     // quantidade
-    // Derivados
-    double densidade;          // populacao / area
-    double pibPerCapita;       // pib / populacao
+    char codigo[8];
+    char nomePais[64];
+    long long populacao;  // habitantes
+    double area;          // km²
+    double pib;           // unidade livre (ex.: bilhões)
+    int    pontosTuristicos;
+    // derivados
+    double densidade;     // populacao / area
+    double pibPerCapita;  // pib / populacao
 } Carta;
 
-/* IDs dos atributos apresentados ao usuário */
 enum {
-    ATTR_NOME = 1,            // exibição apenas
+    ATTR_NOME = 1,  // não numérico para comparação
     ATTR_POPULACAO,
     ATTR_AREA,
     ATTR_PIB,
@@ -41,12 +39,37 @@ enum {
 };
 
 /* ============================
-   Utilidades de Entrada
+   Utilidades de entrada
    ============================ */
-
 static void finalizar_por_eof(void) {
     puts("\nEntrada encerrada. Até mais!");
     exit(0);
+}
+
+static int ler_int(const char *prompt) {
+    char buf[128], *end;
+    long v;
+    while (1) {
+        printf("%s", prompt);
+        if (!fgets(buf, sizeof(buf), stdin)) finalizar_por_eof();
+        v = strtol(buf, &end, 10);
+        while (*end && isspace((unsigned char)*end)) end++;
+        if (end != buf && (*end == '\0' || *end == '\n')) return (int)v;
+        puts("⚠️  Valor inválido. Tente novamente.");
+    }
+}
+
+static double ler_double(const char *prompt) {
+    char buf[128], *end;
+    double v;
+    while (1) {
+        printf("%s", prompt);
+        if (!fgets(buf, sizeof(buf), stdin)) finalizar_por_eof();
+        v = strtod(buf, &end);
+        while (*end && isspace((unsigned char)*end)) end++;
+        if (end != buf && (*end == '\0' || *end == '\n')) return v;
+        puts("⚠️  Valor inválido. Tente novamente.");
+    }
 }
 
 static void ler_string(const char *prompt, char *dest, size_t tam) {
@@ -56,53 +79,16 @@ static void ler_string(const char *prompt, char *dest, size_t tam) {
     if (n && dest[n-1] == '\n') dest[n-1] = '\0';
 }
 
-static int ler_int(const char *prompt) {
-    char buf[128]; char *end;
-    while (1) {
-        printf("%s", prompt);
-        if (!fgets(buf, sizeof(buf), stdin)) finalizar_por_eof();
-        long v = strtol(buf, &end, 10);
-        while (*end && isspace((unsigned char)*end)) end++;
-        if (end != buf && (*end == '\0' || *end == '\n')) return (int)v;
-        puts("⚠️  Valor inválido. Tente novamente.");
-    }
-}
-
-static long long ler_int64(const char *prompt) {
-    char buf[128]; char *end;
-    while (1) {
-        printf("%s", prompt);
-        if (!fgets(buf, sizeof(buf), stdin)) finalizar_por_eof();
-        long long v = strtoll(buf, &end, 10);
-        while (*end && isspace((unsigned char)*end)) end++;
-        if (end != buf && (*end == '\0' || *end == '\n')) return v;
-        puts("⚠️  Valor inválido. Tente novamente.");
-    }
-}
-
-static double ler_double(const char *prompt) {
-    char buf[128]; char *end;
-    while (1) {
-        printf("%s", prompt);
-        if (!fgets(buf, sizeof(buf), stdin)) finalizar_por_eof();
-        double v = strtod(buf, &end);
-        while (*end && isspace((unsigned char)*end)) end++;
-        if (end != buf && (*end == '\0' || *end == '\n')) return v;
-        puts("⚠️  Valor inválido. Tente novamente.");
-    }
-}
-
 /* ============================
-   Cálculos, Impressão, Atributos
+   Cálculos e helpers
    ============================ */
-
 static void calcular_derivados(Carta *c) {
-    c->densidade   = (c->area > 0.0) ? ( (double)c->populacao / c->area ) : 0.0;
-    c->pibPerCapita= (c->populacao > 0) ? ( c->pib / (double)c->populacao ) : 0.0;
+    c->densidade    = (c->area > 0.0) ? ( (double)c->populacao / c->area ) : 0.0;
+    c->pibPerCapita = (c->populacao > 0) ? ( c->pib / (double)c->populacao ) : 0.0;
 }
 
-static const char* nome_atributo(int attr) {
-    switch (attr) {
+static const char* nome_atributo(int a) {
+    switch (a) {
         case ATTR_NOME:       return "Nome do país (exibição)";
         case ATTR_POPULACAO:  return "População (maior vence)";
         case ATTR_AREA:       return "Área (maior vence)";
@@ -113,21 +99,30 @@ static const char* nome_atributo(int attr) {
     }
 }
 
-/* Para formatação na exibição do valor */
-static void imprimir_valor_atributo(const Carta *c, int attr) {
-    switch (attr) {
-        case ATTR_NOME:       printf("%s\n", c->nomePais); break;
-        case ATTR_POPULACAO:  printf("%lld hab\n", c->populacao); break;
-        case ATTR_AREA:       printf("%.2f km²\n", c->area); break;
-        case ATTR_PIB:        printf("%.2f\n", c->pib); break;
-        case ATTR_PONTOS:     printf("%d ponto(s)\n", c->pontosTuristicos); break;
-        case ATTR_DENSIDADE:  printf("%.2f hab/km²\n", c->densidade); break;
-        default:              printf("(atributo inválido)\n");
+static int atributo_e_numerico(int a) {
+    return (a >= ATTR_POPULACAO && a <= ATTR_DENSIDADE);
+}
+
+static double valor_attr(const Carta *c, int a) {
+    switch (a) {
+        case ATTR_POPULACAO:  return (double)c->populacao;
+        case ATTR_AREA:       return c->area;
+        case ATTR_PIB:        return c->pib;
+        case ATTR_PONTOS:     return (double)c->pontosTuristicos;
+        case ATTR_DENSIDADE:  return c->densidade;
+        default:              return 0.0; // nome não é numérico
     }
 }
 
+static int maior_vence(int a) {
+    return a != ATTR_DENSIDADE; // densidade: menor vence
+}
+
+/* ============================
+   Exibição
+   ============================ */
 static void imprimir_carta(const Carta *c) {
-    printf("Carta %s - %s\n", c->codigo, c->nomePais);
+    printf("Carta %s — %s\n", c->codigo, c->nomePais);
     printf("  População: %lld hab\n", c->populacao);
     printf("  Área: %.2f km²\n", c->area);
     printf("  PIB: %.2f\n", c->pib);
@@ -136,256 +131,202 @@ static void imprimir_carta(const Carta *c) {
     printf("  PIB per capita: %.6f\n", c->pibPerCapita);
 }
 
-/* Valor numérico para comparação (nome não é comparável) */
-static double valor_attr(const Carta *c, int attr) {
-    switch (attr) {
-        case ATTR_POPULACAO:  return (double)c->populacao;
-        case ATTR_AREA:       return c->area;
-        case ATTR_PIB:        return c->pib;
-        case ATTR_PONTOS:     return (double)c->pontosTuristicos;
-        case ATTR_DENSIDADE:  return c->densidade;
-        default:              return 0.0;
+static void imprimir_valor_atributo(const Carta *c, int a) {
+    switch (a) {
+        case ATTR_POPULACAO:  printf("%.0f hab",  valor_attr(c,a)); break;
+        case ATTR_AREA:       printf("%.2f km²",  valor_attr(c,a)); break;
+        case ATTR_PIB:        printf("%.2f",      valor_attr(c,a)); break;
+        case ATTR_PONTOS:     printf("%.0f",      valor_attr(c,a)); break;
+        case ATTR_DENSIDADE:  printf("%.2f hab/km²", valor_attr(c,a)); break;
+        default:              printf("(n/d)"); break;
     }
 }
 
-/* “Maior vence?” — densidade é exceção (menor vence) */
-static int maior_vence(int attr) {
-    return attr != ATTR_DENSIDADE; /* 1 para maior-vence, 0 para menor-vence */
+/* Resultado individual de um atributo:
+   Retorna 1 (c1), 2 (c2) ou 0 (empate).
+   Usa operador ternário no resultado final.
+*/
+static int vencedor_por_atributo(const Carta *c1, const Carta *c2, int a) {
+    double v1 = valor_attr(c1, a);
+    double v2 = valor_attr(c2, a);
+
+    if (maior_vence(a)) {
+        return (v1 > v2) ? 1 : (v2 > v1) ? 2 : 0;
+    } else {
+        return (v1 < v2) ? 1 : (v2 < v1) ? 2 : 0;
+    }
 }
 
 /* ============================
-   Cadastro
+   Menus dinâmicos (switch)
    ============================ */
+static void menu_atributos_primario(void) {
+    puts("=== Escolha o ATRIBUTO PRIMÁRIO ===");
+    puts(" 2) População (maior vence)");
+    puts(" 3) Área (maior vence)");
+    puts(" 4) PIB (maior vence)");
+    puts(" 5) Pontos turísticos (maior vence)");
+    puts(" 6) Densidade demográfica (MENOR vence)");
+}
 
+static void menu_atributos_secundario_excluindo(int exclui) {
+    puts("=== Escolha o ATRIBUTO SECUNDÁRIO ===");
+    if (exclui != ATTR_POPULACAO) puts(" 2) População (maior vence)");
+    if (exclui != ATTR_AREA)      puts(" 3) Área (maior vence)");
+    if (exclui != ATTR_PIB)       puts(" 4) PIB (maior vence)");
+    if (exclui != ATTR_PONTOS)    puts(" 5) Pontos turísticos (maior vence)");
+    if (exclui != ATTR_DENSIDADE) puts(" 6) Densidade demográfica (MENOR vence)");
+}
+
+static int ler_opcao_primaria(void) {
+    int a;
+    while (1) {
+        menu_atributos_primario();
+        a = ler_int("Opção: ");
+        switch (a) {
+            case ATTR_POPULACAO:
+            case ATTR_AREA:
+            case ATTR_PIB:
+            case ATTR_PONTOS:
+            case ATTR_DENSIDADE:
+                return a;
+            default:
+                puts("⚠️  Opção inválida. Tente novamente.\n");
+        }
+    }
+}
+
+static int ler_opcao_secundaria(int primario) {
+    int a;
+    while (1) {
+        menu_atributos_secundario_excluindo(primario);
+        a = ler_int("Opção: ");
+        switch (a) {
+            case ATTR_POPULACAO:
+            case ATTR_AREA:
+            case ATTR_PIB:
+            case ATTR_PONTOS:
+            case ATTR_DENSIDADE:
+                if (a == primario) {
+                    puts("⚠️  O secundário deve ser diferente do primário.\n");
+                    break;
+                }
+                return a;
+            default:
+                puts("⚠️  Opção inválida. Tente novamente.\n");
+        }
+    }
+}
+
+/* ============================
+   Rodada MESTRE (2 atributos)
+   ============================ */
+static void rodada_mestre(const Carta *c1, const Carta *c2) {
+    puts("\n===== COMPARAÇÃO: DOIS ATRIBUTOS =====");
+    int a1 = ler_opcao_primaria();
+    int a2 = ler_opcao_secundaria(a1);
+
+    puts("\n=== Cartas cadastradas ===");
+    imprimir_carta(c1); puts("");
+    imprimir_carta(c2); puts("");
+
+    printf("=== Atributos escolhidos ===\n");
+    printf("Primário:   %s\n", nome_atributo(a1));
+    printf("Secundário: %s\n\n", nome_atributo(a2));
+
+    /* Comparação individual (apenas exibição do vencedor por atributo) */
+    int r1 = vencedor_por_atributo(c1, c2, a1);
+    int r2 = vencedor_por_atributo(c1, c2, a2);
+
+    printf("Valores — %s\n", c1->nomePais);
+    printf("  Primário:   "); imprimir_valor_atributo(c1, a1); printf("\n");
+    printf("  Secundário: "); imprimir_valor_atributo(c1, a2); printf("\n\n");
+
+    printf("Valores — %s\n", c2->nomePais);
+    printf("  Primário:   "); imprimir_valor_atributo(c2, a1); printf("\n");
+    printf("  Secundário: "); imprimir_valor_atributo(c2, a2); printf("\n\n");
+
+    printf("Vencedor por atributo:\n");
+    printf("  %s: %s\n", nome_atributo(a1),
+           r1==1 ? c1->nomePais : r1==2 ? c2->nomePais : "Empate");
+    printf("  %s: %s\n\n", nome_atributo(a2),
+           r2==1 ? c1->nomePais : r2==2 ? c2->nomePais : "Empate");
+
+    /* Soma dos atributos (valores brutos) */
+    double soma1 = valor_attr(c1, a1) + valor_attr(c1, a2);
+    double soma2 = valor_attr(c2, a1) + valor_attr(c2, a2);
+
+    printf("Somas:\n");
+    printf("  %s: %.6f\n", c1->nomePais, soma1);
+    printf("  %s: %.6f\n\n", c2->nomePais, soma2);
+
+    /* Resultado final por soma */
+    if (soma1 > soma2) {
+        printf("Resultado: %s venceu pela maior soma!\n", c1->nomePais);
+    } else if (soma2 > soma1) {
+        printf("Resultado: %s venceu pela maior soma!\n", c2->nomePais);
+    } else {
+        printf("Resultado: Empate!\n");
+    }
+}
+
+/* ============================
+   Menu principal
+   ============================ */
+static void menu_principal(void) {
+    puts("===== SUPER TRUNFO — PAÍSES (MESTRE) =====");
+    puts("1) Exibir cartas");
+    puts("2) Comparar por DOIS atributos");
+    puts("3) Editar cartas");
+    puts("0) Sair");
+}
+
+/* Cadastro simples (permitido manter pré-cadastradas, mas opção de editar ajuda usabilidade) */
 static void cadastrar_carta(Carta *c, const char *rotulo) {
     printf("\n=== Cadastro da %s ===\n", rotulo);
     ler_string("Código da carta: ", c->codigo, sizeof(c->codigo));
     ler_string("Nome do país: ", c->nomePais, sizeof(c->nomePais));
-    c->populacao        = ler_int64("População (habitantes): ");
+    c->populacao        = (long long)ler_double("População (habitantes): ");
     c->area             = ler_double("Área (km²): ");
-    c->pib              = ler_double("PIB (na unidade que preferir): ");
-    c->pontosTuristicos = ler_int("Número de pontos turísticos: ");
+    c->pib              = ler_double("PIB (unidade livre): ");
+    c->pontosTuristicos = ler_int("Pontos turísticos: ");
     calcular_derivados(c);
 }
 
-/* ============================
-   Comparações
-   ============================ */
-
-/* Retorna: 1 se c1 vence; 2 se c2 vence; 0 empate; -1 atributo não comparável */
-static int comparar_um_atributo(const Carta *c1, const Carta *c2, int attr) {
-    if (attr == ATTR_NOME) return -1; // não comparável
-
-    const double v1 = valor_attr(c1, attr);
-    const double v2 = valor_attr(c2, attr);
-
-    /* Decisão aninhada + regra especial */
-    if (maior_vence(attr)) {
-        if (v1 > v2) return 1;
-        else if (v2 > v1) return 2;
-        else {
-            /* Desempate ilustrativo: maior PIB per capita vence */
-            if (c1->pibPerCapita > c2->pibPerCapita) return 1;
-            else if (c2->pibPerCapita > c1->pibPerCapita) return 2;
-            else return 0;
-        }
-    } else { /* menor vence (densidade) */
-        if (v1 < v2) return 1;
-        else if (v2 < v1) return 2;
-        else {
-            /* Desempate ilustrativo para densidade: MAIOR área vence */
-            if (c1->area > c2->area) return 1;
-            else if (c2->area > c1->area) return 2;
-            else return 0;
-        }
-    }
-}
-
-/*
-  Comparação de DOIS atributos (nível Mestre).
-  - Compara pelo atributo primário.
-  - Se empatar, compara pelo secundário.
-  - Se ainda empatar, aplica um encadeamento com OPERADORES TERNÁRIOS.
-  Retorna 1, 2 ou 0 (empate).
-*/
-static int comparar_dois_atributos(const Carta *c1, const Carta *c2, int attr1, int attr2) {
-    int r1 = comparar_um_atributo(c1, c2, attr1);
-    if (r1 == 1 || r1 == 2) return r1;
-
-    int r2 = comparar_um_atributo(c1, c2, attr2);
-    if (r2 == 1 || r2 == 2) return r2;
-
-    /* Desempate final (ternários): 
-       - Primeiro, maior PIB per capita vence.
-       - Se ainda empate, maior PIB total vence.
-       - Se ainda empate, MAIOR população vence (apenas para desempate final).
-    */
-    return (c1->pibPerCapita > c2->pibPerCapita) ? 1
-         : (c2->pibPerCapita > c1->pibPerCapita) ? 2
-         : (c1->pib > c2->pib) ? 1
-         : (c2->pib > c1->pib) ? 2
-         : (c1->populacao > c2->populacao) ? 1
-         : (c2->populacao > c1->populacao) ? 2
-         : 0;
-}
-
-/* ============================
-   Menus (dinâmicos) e Rodadas
-   ============================ */
-
-static void menu_atributos(void) {
-    puts("Atributos disponíveis:");
-    printf("  %d) %s\n", ATTR_NOME,      nome_atributo(ATTR_NOME));
-    printf("  %d) %s\n", ATTR_POPULACAO, nome_atributo(ATTR_POPULACAO));
-    printf("  %d) %s\n", ATTR_AREA,      nome_atributo(ATTR_AREA));
-    printf("  %d) %s\n", ATTR_PIB,       nome_atributo(ATTR_PIB));
-    printf("  %d) %s\n", ATTR_PONTOS,    nome_atributo(ATTR_PONTOS));
-    printf("  %d) %s\n", ATTR_DENSIDADE, nome_atributo(ATTR_DENSIDADE));
-}
-
-static int escolher_atributo_unico(const char *prompt) {
-    int a;
-    while (1) {
-        menu_atributos();
-        a = ler_int(prompt);
-        if (a >= ATTR_NOME && a <= ATTR_DENSIDADE) return a;
-        puts("⚠️  Opção inexistente. Tente novamente.\n");
-    }
-}
-
-static void escolher_dois_atributos(int *a1, int *a2) {
-    while (1) {
-        menu_atributos();
-        *a1 = ler_int("Escolha o atributo PRIMÁRIO: ");
-        *a2 = ler_int("Escolha o atributo SECUNDÁRIO (diferente do primário): ");
-        if (*a1 < ATTR_NOME || *a1 > ATTR_DENSIDADE ||
-            *a2 < ATTR_NOME || *a2 > ATTR_DENSIDADE) {
-            puts("⚠️  Atributo inválido. Tente novamente.\n");
-            continue;
-        }
-        if (*a1 == *a2) {
-            puts("⚠️  Os atributos não podem ser iguais. Tente novamente.\n");
-            continue;
-        }
-        break;
-    }
-}
-
-static void exibir_cartas(const Carta *c1, const Carta *c2) {
-    puts("\n=== Cartas cadastradas ===");
-    imprimir_carta(c1);
-    putchar('\n');
-    imprimir_carta(c2);
-    putchar('\n');
-}
-
-static void rodada_um_atributo(const Carta *c1, const Carta *c2) {
-    puts("\n=== COMPARAÇÃO: UM ATRIBUTO ===");
-    int attr = escolher_atributo_unico("Escolha o atributo: ");
-    exibir_cartas(c1, c2);
-
-    printf("=== Comparação (Atributo: %s) ===\n", nome_atributo(attr));
-
-    printf("Carta 1 - %s: ", c1->nomePais); imprimir_valor_atributo(c1, attr);
-    printf("Carta 2 - %s: ", c2->nomePais); imprimir_valor_atributo(c2, attr);
-
-    int r = comparar_um_atributo(c1, c2, attr);
-    if (r == -1) {
-        printf("\nObservação: 'Nome do país' é apenas exibição — nenhuma carta vence.\n");
-        return;
-    }
-    if (r == 1)      printf("\nResultado: Carta 1 (%s) venceu!\n", c1->nomePais);
-    else if (r == 2) printf("\nResultado: Carta 2 (%s) venceu!\n", c2->nomePais);
-    else             printf("\nResultado: Empate!\n");
-}
-
-static void rodada_dois_atributos(const Carta *c1, const Carta *c2) {
-    puts("\n=== COMPARAÇÃO: DOIS ATRIBUTOS (MESTRE) ===");
-    int a1, a2;
-    escolher_dois_atributos(&a1, &a2);
-    exibir_cartas(c1, c2);
-
-    printf("=== Comparação (Primário: %s | Secundário: %s) ===\n",
-           nome_atributo(a1), nome_atributo(a2));
-
-    printf("Carta 1 - %s:\n", c1->nomePais);
-    printf("  Primário:   "); imprimir_valor_atributo(c1, a1);
-    printf("  Secundário: "); imprimir_valor_atributo(c1, a2);
-
-    printf("Carta 2 - %s:\n", c2->nomePais);
-    printf("  Primário:   "); imprimir_valor_atributo(c2, a1);
-    printf("  Secundário: "); imprimir_valor_atributo(c2, a2);
-
-    /* Se qualquer atributo escolhido for 'nome', tratamos como não comparável no passo daquele atributo.
-       A função comparar_dois_atributos já resolve empates com ternários ao final. */
-    int r = comparar_dois_atributos(c1, c2, a1, a2);
-
-    if (r == 1)      printf("\nResultado: Carta 1 (%s) venceu!\n", c1->nomePais);
-    else if (r == 2) printf("\nResultado: Carta 2 (%s) venceu!\n", c2->nomePais);
-    else             printf("\nResultado: Empate!\n");
-}
-
-/* ============================
-   Menu Principal
-   ============================ */
-
-static void menu_principal(void) {
-    puts("===== SUPER TRUNFO — PAÍSES =====");
-    puts("1) Cadastrar/Editar cartas");
-    puts("2) Exibir cartas");
-    puts("3) Comparar por UM atributo");
-    puts("4) Comparar por DOIS atributos (Mestre)");
-    puts("0) Sair");
-}
-
 int main(void) {
-    Carta c1 = {0}, c2 = {0};
-    int cadastradas = 0;
-
-    puts("Bem-vindo ao Super Trunfo — Países!");
-    puts("Cadastre duas cartas para começar.");
+    /* Cartas pré-cadastradas (permitido pelo enunciado do nível avançado) */
+    Carta c1 = { "A01", "Brasil",        203000000, 8515767.0,  9847.0, 35, 0 };
+    Carta c2 = { "B02", "Argentina",      46000000, 2780400.0,  4876.0, 22, 0 };
+    calcular_derivados(&c1);
+    calcular_derivados(&c2);
 
     while (1) {
-        putchar('\n');
+        puts("");
         menu_principal();
-        int op = ler_int("Escolha uma opção: ");
+        int op = ler_int("Opção: ");
         switch (op) {
             case 0:
                 puts("Saindo... Obrigado por jogar!");
                 return 0;
 
-            case 1: { /* Cadastro / edição */
+            case 1:
+                puts("");
+                imprimir_carta(&c1); puts("");
+                imprimir_carta(&c2);
+                break;
+
+            case 2:
+                rodada_mestre(&c1, &c2);
+                break;
+
+            case 3:
                 cadastrar_carta(&c1, "Carta 1");
                 cadastrar_carta(&c2, "Carta 2");
-                cadastradas = 1;
-            } break;
-
-            case 2: { /* Exibir */
-                if (!cadastradas) {
-                    puts("⚠️  Nenhuma carta cadastrada. Cadastre primeiro (opção 1).");
-                } else {
-                    exibir_cartas(&c1, &c2);
-                }
-            } break;
-
-            case 3: { /* Um atributo */
-                if (!cadastradas) {
-                    puts("⚠️  Nenhuma carta cadastrada. Cadastre primeiro (opção 1).");
-                } else {
-                    rodada_um_atributo(&c1, &c2);
-                }
-            } break;
-
-            case 4: { /* Dois atributos (Mestre) */
-                if (!cadastradas) {
-                    puts("⚠️  Nenhuma carta cadastrada. Cadastre primeiro (opção 1).");
-                } else {
-                    rodada_dois_atributos(&c1, &c2);
-                }
-            } break;
+                break;
 
             default:
-                puts("⚠️  Opção inexistente. Tente novamente.");
+                puts("⚠️  Opção inválida. Tente novamente.");
+                break;
         }
     }
     return 0;
